@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import {
   ArrayNotEmpty,
   IsArray,
@@ -13,6 +14,7 @@ export class CreateMenuItemDto {
   name: string;
 
   @ApiProperty()
+  @Transform(({ value }) => Number(value))
   @IsNotEmpty()
   @IsNumber()
   price: number;

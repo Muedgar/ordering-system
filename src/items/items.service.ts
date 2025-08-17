@@ -1,14 +1,18 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository, In, FindManyOptions } from 'typeorm';
 import { Ingredient } from './entities/ingredient.entity';
 import { MenuItem } from './entities/menu-item.entity';
 import { CreateIngredientDto } from './dto/create-ingredient.dto';
 import { CreateMenuItemDto } from './dto/create-menu-item.dto';
 import { UpdateItemDto } from './dto/update-menu-item.dto';
-import { BufferedFile } from 'src/common/interfaces';
+import { BufferedFile, FilterResponse } from 'src/common/interfaces';
 import { FileManagerService } from 'src/common/services/file.service';
 import { v2 as cloudinary } from 'cloudinary';
+import { ListFilterDTO } from 'src/common/dtos';
+import { IngredientSerializer } from './serializers/ingredient.serializer';
+import { ListFilterService } from 'src/common/services';
+import { MenuItemSerializer } from './serializers/menu-item.serializer';
 
 @Injectable()
 export class ItemsService {
@@ -41,15 +45,33 @@ export class ItemsService {
     return this.ingredientRepository.save(ingredient);
   }
 
-  async findAllIngredients(): Promise<any> {
-    const ingredients = await this.ingredientRepository.find();
+  async findAllIngredients(
+    filters: ListFilterDTO,
+  ): Promise<FilterResponse<IngredientSerializer>> {
+    const listFilterService = new ListFilterService(
+      this.ingredientRepository,
+      IngredientSerializer,
+    );
 
-    return ingredients.map((ingredient) => ({
+    // Use filter service with search + pagination
+    const result = await listFilterService.filter({
+      filters,
+      searchFields: ['name', 'description'], // whatever fields you want searchable
+    });
+
+    // Map over items to add imageUrl
+    const itemsWithImage = result.items.map((ingredient: Ingredient) => ({
       ...ingredient,
       imageUrl: ingredient.image
         ? cloudinary.url(ingredient.image, { secure: true })
         : undefined,
     }));
+
+    // Return the same structure as FilterResponse but with updated items
+    return {
+      ...result,
+      items: itemsWithImage,
+    };
   }
 
   async findIngredientById(id: string): Promise<Ingredient> {
@@ -109,28 +131,63 @@ export class ItemsService {
     return this.menuItemRepository.save(menuItem);
   }
 
-  async findAllMenuItems(): Promise<any> {
-    const menuItems = await this.menuItemRepository.find({
-      relations: ['ingredients'],
+  async findAllMenuItems(filters: ListFilterDTO): Promise<any> {
+    const listFilterService = new ListFilterService(
+      this.menuItemRepository,
+      MenuItemSerializer,
+    );
+
+    const options: FindManyOptions<MenuItem> = { relations: ['ingredients'] };
+
+    // Use filter service with search + pagination
+    const result = await listFilterService.filter({
+      filters,
+      searchFields: ['name', 'price'], // whatever fields you want searchable
+      options,
     });
-    return menuItems.map((menuItem) => ({
+
+    // Map over items to add imageUrl
+    const itemsWithImage = result.items.map((menuItem: MenuItem) => ({
       ...menuItem,
       imageUrl: menuItem.image
         ? cloudinary.url(menuItem.image, { secure: true })
         : undefined,
     }));
+
+    // Return the same structure as FilterResponse but with updated items
+    return {
+      ...result,
+      items: itemsWithImage,
+    };
   }
 
-  async findMenuItemById(id: string): Promise<MenuItem> {
+  async findMenuItemById(id: string): Promise<any> {
     const menuItem = await this.menuItemRepository.findOne({
       where: { id },
       relations: ['ingredients'],
     });
+
     if (!menuItem) {
       throw new NotFoundException(`MenuItem with ID ${id} not found`);
     }
-    return menuItem;
+
+    // Add imageUrl to menu item
+    const menuItemWithImage = {
+      ...menuItem,
+      imageUrl: menuItem.image
+        ? cloudinary.url(menuItem.image, { secure: true })
+        : undefined,
+      ingredients: menuItem.ingredients.map((ingredient) => ({
+        ...ingredient,
+        imageUrl: ingredient.image
+          ? cloudinary.url(ingredient.image, { secure: true })
+          : undefined,
+      })),
+    };
+
+    return menuItemWithImage;
   }
+
   async updateMenuItem(
     id: string,
     dto: UpdateItemDto,
