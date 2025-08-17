@@ -10,6 +10,7 @@ import {
   ParseUUIDPipe,
   UploadedFile,
   UseInterceptors,
+  Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ItemsService } from './items.service';
@@ -17,6 +18,7 @@ import { CreateIngredientDto } from './dto/create-ingredient.dto';
 import { CreateMenuItemDto } from './dto/create-menu-item.dto';
 import { BufferedFile } from 'src/common/interfaces';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { ListFilterDTO } from 'src/common/dtos';
 
 @ApiTags('Items')
 @Controller('items')
@@ -38,8 +40,8 @@ export class ItemsController {
 
   @Get('ingredients')
   @ApiOperation({ summary: 'Get all ingredients' })
-  async findAllIngredients() {
-    return this.itemsService.findAllIngredients();
+  async findAllIngredients(@Query() listFilterDto: ListFilterDTO) {
+    return this.itemsService.findAllIngredients(listFilterDto);
   }
 
   @Get('ingredients/:id')
@@ -81,8 +83,8 @@ export class ItemsController {
 
   @Get('menu')
   @ApiOperation({ summary: 'Get all menu items' })
-  async findAllMenuItems() {
-    return this.itemsService.findAllMenuItems();
+  async findAllMenuItems(@Query() listFilterDto: ListFilterDTO) {
+    return this.itemsService.findAllMenuItems(listFilterDto);
   }
 
   @Get('menu/:id')
